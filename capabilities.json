@@ -1,0 +1,351 @@
+{
+    "dataRoles": [
+        {
+            "displayName": "Camadas WKT (Geometria)",
+            "name": "wkt",
+            "kind": "Grouping",
+            "description": "Uma ou mais colunas com polígonos em formato WKT. Cada coluna é tratada como uma camada independente no mapa."
+        },
+        {
+            "displayName": "Categoria / Nome",
+            "name": "category",
+            "kind": "Grouping",
+            "description": "Nome ou identificador do polígono para exibição e seleção"
+        },
+        {
+            "displayName": "Cor de Preenchimento",
+            "name": "fillColor",
+            "kind": "Measure",
+            "description": "Código de cor hexadecimal (ex: #3B82F6) para formatação condicional"
+        },
+        {
+            "displayName": "Dicas de Ferramenta (Tooltips)",
+            "name": "tooltips",
+            "kind": "Measure",
+            "description": "Medidas ou valores adicionais para exibir no tooltip"
+        }
+    ],
+    "objects": {
+        "layerConfig": {
+            "displayName": "Controle de Camadas",
+            "properties": {
+                "showLayerControl": {
+                    "displayName": "Exibir Seletor de Camadas",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "autoFitOnToggle": {
+                    "displayName": "Ajustar Zoom ao Alternar Camadas",
+                    "type": {
+                        "bool": true
+                    }
+                }
+            }
+        },
+        "wmsConfig": {
+            "displayName": "Camada WMS / WFS (Externa)",
+            "properties": {
+                "enabled": {
+                    "displayName": "Ativar Camada Externa",
+                    "description": "Ativa a exibição de uma camada externa WMS ou WFS",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "serviceType": {
+                    "displayName": "Tipo de Serviço",
+                    "description": "Escolha entre WMS (raster/tiles) ou WFS (vetorial GeoJSON)",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "wms",
+                                "displayName": "WMS (Web Map Service)"
+                            },
+                            {
+                                "value": "wfs",
+                                "displayName": "WFS (Web Feature Service)"
+                            }
+                        ]
+                    }
+                },
+                "layerTitle": {
+                    "displayName": "Nome de Exibição da Camada",
+                    "description": "Nome que aparecerá no seletor de camadas e legendas",
+                    "type": {
+                        "text": true
+                    }
+                },
+                "url": {
+                    "displayName": "Link / URL do Serviço (WMS ou WFS)",
+                    "description": "URL base ou completa do serviço WMS/WFS",
+                    "type": {
+                        "text": true
+                    }
+                },
+                "layerName": {
+                    "displayName": "Nome da Camada (layers / typeName)",
+                    "description": "Identificador da camada no servidor (ex: workspace:camada). Opcional se já estiver na URL.",
+                    "type": {
+                        "text": true
+                    }
+                },
+                "opacity": {
+                    "displayName": "Opacidade (%)",
+                    "description": "Opacidade da camada no mapa (0 a 100)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "wmsFormat": {
+                    "displayName": "Formato de Imagem (WMS)",
+                    "description": "Formato de imagem solicitado ao servidor WMS",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "image/png",
+                                "displayName": "PNG (Transparente - Recomendado)"
+                            },
+                            {
+                                "value": "image/jpeg",
+                                "displayName": "JPEG (Sem transparência)"
+                            }
+                        ]
+                    }
+                },
+                "wmsTransparent": {
+                    "displayName": "Fundo Transparente (WMS)",
+                    "description": "Permite visualizar as camadas inferiores sob o WMS",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "wmsVersion": {
+                    "displayName": "Versão do WMS",
+                    "description": "Versão do protocolo WMS",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "1.1.1",
+                                "displayName": "1.1.1 (Padrão mais compatível)"
+                            },
+                            {
+                                "value": "1.3.0",
+                                "displayName": "1.3.0"
+                            }
+                        ]
+                    }
+                },
+                "wfsColor": {
+                    "displayName": "Cor dos Elementos (WFS)",
+                    "description": "Cor de preenchimento dos vetores WFS",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "wfsStrokeColor": {
+                    "displayName": "Cor da Borda (WFS)",
+                    "description": "Cor do contorno dos vetores WFS",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "mapConfig": {
+            "displayName": "Configurações do Mapa",
+            "properties": {
+                "basemap": {
+                    "displayName": "Estilo do Mapa Base",
+                    "description": "Selecione o estilo do mapa de fundo",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "carto-light",
+                                "displayName": "Carto Claro (Positron)"
+                            },
+                            {
+                                "value": "carto-dark",
+                                "displayName": "Carto Escuro (Dark Matter)"
+                            },
+                            {
+                                "value": "osm",
+                                "displayName": "OpenStreetMap Padrão"
+                            },
+                            {
+                                "value": "esri-satellite",
+                                "displayName": "Esri Imagem de Satélite"
+                            },
+                            {
+                                "value": "custom",
+                                "displayName": "URL de Tiles Personalizada"
+                            }
+                        ]
+                    }
+                },
+                "customStyleUrl": {
+                    "displayName": "URL de Tiles Personalizada",
+                    "description": "URL com padrão {z}/{x}/{y}.png",
+                    "type": {
+                        "text": true
+                    }
+                },
+                "autoFit": {
+                    "displayName": "Ajuste Automático de Zoom (Fit Bounds)",
+                    "description": "Ajusta o zoom aos limites dos polígonos automaticamente",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "invertCoordinates": {
+                    "displayName": "Inverter Coordenadas (Lat/Lon)",
+                    "description": "Ative se o seu WKT estiver com Latitude e Longitude invertidas",
+                    "type": {
+                        "bool": true
+                    }
+                }
+            }
+        },
+        "polygonConfig": {
+            "displayName": "Estilo dos Polígonos",
+            "properties": {
+                "defaultFillColor": {
+                    "displayName": "Cor de Preenchimento Padrão",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "fillOpacity": {
+                    "displayName": "Opacidade de Preenchimento (%)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "strokeColor": {
+                    "displayName": "Cor da Borda",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "strokeWidth": {
+                    "displayName": "Espessura da Borda (px)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "strokeOpacity": {
+                    "displayName": "Opacidade da Borda (%)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "highlightColor": {
+                    "displayName": "Cor de Seleção / Destaque",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "unselectedOpacity": {
+                    "displayName": "Opacidade ao Desmarcar (%)",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
+        },
+        "tooltipConfig": {
+            "displayName": "Dicas de Ferramenta (Tooltip)",
+            "properties": {
+                "showTooltip": {
+                    "displayName": "Exibir Tooltips",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "showWktInTooltip": {
+                    "displayName": "Incluir Texto WKT no Tooltip",
+                    "type": {
+                        "bool": true
+                    }
+                }
+            }
+        }
+    },
+    "dataViewMappings": [
+        {
+            "conditions": [
+                {
+                    "wkt": { "min": 0, "max": 20 },
+                    "category": { "max": 10 },
+                    "fillColor": { "max": 1 },
+                    "tooltips": { "max": 20 }
+                }
+            ],
+            "categorical": {
+                "categories": {
+                    "select": [
+                        {
+                            "bind": {
+                                "to": "wkt"
+                            }
+                        },
+                        {
+                            "bind": {
+                                "to": "category"
+                            }
+                        }
+                    ],
+                    "dataReductionAlgorithm": {
+                        "top": {
+                            "count": 30000
+                        }
+                    }
+                },
+                "values": {
+                    "select": [
+                        {
+                            "bind": {
+                                "to": "fillColor"
+                            }
+                        },
+                        {
+                            "bind": {
+                                "to": "tooltips"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "supportsHighlight": true,
+    "privileges": [
+        {
+            "name": "WebAccess",
+            "essential": true,
+            "parameters": [
+                "*"
+            ]
+        }
+    ]
+}

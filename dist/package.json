@@ -1,0 +1,17 @@
+{
+		"version": "1.0.0.0",
+		"author": {"name":"Marcelo","email":"marcelo@example.com"},
+		"resources": [
+			{
+				"resourceId": "rId0",
+				"sourceType": 5,
+				"file": "resources/wktPolygonMapD3C983E422CF431EB88DC278ED1CA011.pbiviz.json"
+			}
+		],
+		"visual": {"name":"wktPolygonMap","displayName":"WKT Polygon Map","guid":"wktPolygonMapD3C983E422CF431EB88DC278ED1CA011","visualClassName":"Visual","version":"1.0.0.0","description":"Simplified custom visual to render polygons from WKT on a map with cross-filtering, auto-zoom, and custom styling.","supportUrl":"https://github.com/marcelo","gitHubUrl":"https://github.com/marcelo"},
+		"metadata": {
+			"pbivizjson": {
+				"resourceId": "rId0"
+			}
+		}
+	}
