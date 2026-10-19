@@ -44,23 +44,27 @@
             }
         },
         "wmsConfig": {
-            "displayName": "Camada WMS / WFS (Externa)",
+            "displayName": "Camada Externa (WMS / WMTS / WFS)",
             "properties": {
                 "enabled": {
                     "displayName": "Ativar Camada Externa",
-                    "description": "Ativa a exibição de uma camada externa WMS ou WFS",
+                    "description": "Ativa a exibição de uma camada externa WMS, WMTS ou WFS",
                     "type": {
                         "bool": true
                     }
                 },
                 "serviceType": {
                     "displayName": "Tipo de Serviço",
-                    "description": "Escolha entre WMS (raster/tiles) ou WFS (vetorial GeoJSON)",
+                    "description": "Escolha entre WMS (raster dinâmico), WMTS (tiles pré-renderizados) ou WFS (vetorial GeoJSON)",
                     "type": {
                         "enumeration": [
                             {
                                 "value": "wms",
                                 "displayName": "WMS (Web Map Service)"
+                            },
+                            {
+                                "value": "wmts",
+                                "displayName": "WMTS (Web Map Tile Service)"
                             },
                             {
                                 "value": "wfs",

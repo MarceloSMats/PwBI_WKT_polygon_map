@@ -40,7 +40,7 @@ interface LayerConfig {
     count: number;
     leafletLayer: L.Layer;
     leafletGroup?: L.FeatureGroup;
-    type: "wkt" | "wms" | "wfs";
+    type: "wkt" | "wms" | "wmts" | "wfs";
 }
 
 interface PolygonItem {
@@ -72,9 +72,11 @@ export class Visual implements IVisual {
     private currentTileLayer: L.TileLayer | null = null;
     private currentBasemapKey = "";
 
-    // External Layer (WMS / WFS) properties
+    // External Layer (WMS / WMTS / WFS) properties
     private currentWmsLayer: L.TileLayer.WMS | null = null;
     private currentWmsKey = "";
+    private currentWmtsLayer: L.TileLayer | null = null;
+    private currentWmtsKey = "";
     private cachedWfsUrl = "";
     private cachedWfsGeoJson: any = null;
     private isFetchingWfs = false;
@@ -646,7 +648,9 @@ export class Visual implements IVisual {
         const isEnabled = wmsConfig?.enabled?.value ?? false;
         const rawUrl = (wmsConfig?.url?.value || "").trim();
         const serviceType = ((wmsConfig?.serviceType?.value as string) || "wms").toLowerCase();
-        const layerTitle = (wmsConfig?.layerTitle?.value || "").trim() || (serviceType === "wms" ? "Camada WMS" : "Camada WFS");
+        const layerTitle = (wmsConfig?.layerTitle?.value || "").trim() || (
+            serviceType === "wms" ? "Camada WMS" : serviceType === "wmts" ? "Camada WMTS" : "Camada WFS"
+        );
         const configuredLayer = (wmsConfig?.layerName?.value || "").trim();
         const opacityNum = (wmsConfig?.opacity?.value ?? 80) as number;
         const opacity = Math.max(0, Math.min(100, opacityNum)) / 100;
@@ -660,6 +664,12 @@ export class Visual implements IVisual {
             }
             this.currentWmsLayer = null;
             this.currentWmsKey = "";
+
+            if (this.currentWmtsLayer && this.map?.hasLayer(this.currentWmtsLayer)) {
+                this.map.removeLayer(this.currentWmtsLayer);
+            }
+            this.currentWmtsLayer = null;
+            this.currentWmtsKey = "";
 
             if (this.wfsLayerGroup && this.map?.hasLayer(this.wfsLayerGroup)) {
                 this.map.removeLayer(this.wfsLayerGroup);
@@ -677,11 +687,17 @@ export class Visual implements IVisual {
             : true;
 
         if (serviceType === "wms") {
-            // Clean up WFS if switching types
+            // Clean up WFS and WMTS if switching types
             if (this.wfsLayerGroup && this.map?.hasLayer(this.wfsLayerGroup)) {
                 this.map.removeLayer(this.wfsLayerGroup);
             }
             this.wfsLayerGroup = null;
+
+            if (this.currentWmtsLayer && this.map?.hasLayer(this.currentWmtsLayer)) {
+                this.map.removeLayer(this.currentWmtsLayer);
+            }
+            this.currentWmtsLayer = null;
+            this.currentWmtsKey = "";
 
             const wmsFormat = (wmsConfig?.wmsFormat?.value as string) || "image/png";
             const wmsTransparent = wmsConfig?.wmsTransparent?.value ?? true;
@@ -723,6 +739,48 @@ export class Visual implements IVisual {
             };
 
             this.layers.set(externalLayerId, layerConfig);
+        } else if (serviceType === "wmts") {
+            // Clean up WMS and WFS if switching types
+            if (this.currentWmsLayer && this.map?.hasLayer(this.currentWmsLayer)) {
+                this.map.removeLayer(this.currentWmsLayer);
+            }
+            this.currentWmsLayer = null;
+            this.currentWmsKey = "";
+
+            if (this.wfsLayerGroup && this.map?.hasLayer(this.wfsLayerGroup)) {
+                this.map.removeLayer(this.wfsLayerGroup);
+            }
+            this.wfsLayerGroup = null;
+
+            const wmtsUrlTemplate = this.parseWmtsUrl(rawUrl, configuredLayer);
+            const wmtsKey = `${wmtsUrlTemplate}`;
+
+            if (wmtsKey !== this.currentWmtsKey || !this.currentWmtsLayer) {
+                if (this.currentWmtsLayer && this.map?.hasLayer(this.currentWmtsLayer)) {
+                    this.map.removeLayer(this.currentWmtsLayer);
+                }
+
+                this.currentWmtsLayer = L.tileLayer(wmtsUrlTemplate, {
+                    opacity: opacity,
+                    maxZoom: 22,
+                    zIndex: 250
+                });
+                this.currentWmtsKey = wmtsKey;
+            } else {
+                this.currentWmtsLayer.setOpacity(opacity);
+            }
+
+            const layerConfig: LayerConfig = {
+                id: externalLayerId,
+                name: layerTitle,
+                color: "#0ea5e9",
+                visible: isVisible,
+                count: 0,
+                leafletLayer: this.currentWmtsLayer,
+                type: "wmts"
+            };
+
+            this.layers.set(externalLayerId, layerConfig);
         } else {
             // serviceType === "wfs"
             if (this.currentWmsLayer && this.map?.hasLayer(this.currentWmsLayer)) {
@@ -730,6 +788,12 @@ export class Visual implements IVisual {
             }
             this.currentWmsLayer = null;
             this.currentWmsKey = "";
+
+            if (this.currentWmtsLayer && this.map?.hasLayer(this.currentWmtsLayer)) {
+                this.map.removeLayer(this.currentWmtsLayer);
+            }
+            this.currentWmtsLayer = null;
+            this.currentWmtsKey = "";
 
             const targetWfsUrl = this.buildWfsUrl(rawUrl, configuredLayer);
             const wfsColor = wmsConfig?.wfsColor?.value?.value || "#8b5cf6";
@@ -929,6 +993,47 @@ export class Visual implements IVisual {
             }
 
             return `${base}?${params.toString()}`;
+        } catch (e) {
+            return cleanUrl;
+        }
+    }
+
+    private parseWmtsUrl(rawUrl: string, configuredLayer: string): string {
+        let cleanUrl = rawUrl.trim();
+        if (!cleanUrl) return "";
+
+        // Case 1: Template URL already provided by the user (RESTful or standard template)
+        // e.g.: https://server/wmts/layer/{z}/{x}/{y}.png or ...&TileMatrix={z}&TileRow={y}&TileCol={x}
+        const hasZ = /\{z\}|\{TileMatrix\}/i.test(cleanUrl);
+        const hasX = /\{x\}|\{TileCol\}/i.test(cleanUrl);
+        const hasY = /\{y\}|\{TileRow\}/i.test(cleanUrl);
+
+        if (hasZ && hasX && hasY) {
+            return cleanUrl
+                .replace(/\{TileMatrix\}/gi, "{z}")
+                .replace(/\{TileCol\}/gi, "{x}")
+                .replace(/\{TileRow\}/gi, "{y}");
+        }
+
+        // Case 2: KVP standard WMTS endpoint (Key-Value Pair)
+        try {
+            const [base, query] = cleanUrl.includes("?") ? cleanUrl.split("?") : [cleanUrl, ""];
+            const params = new URLSearchParams(query);
+
+            const layer = configuredLayer.trim() || params.get("layer") || params.get("LAYER") || "";
+            const style = params.get("style") || params.get("STYLE") || "default";
+            const tileMatrixSet = params.get("tilematrixset") || params.get("TILEMATRIXSET") || params.get("TileMatrixSet") || "EPSG:3857";
+            const format = params.get("format") || params.get("FORMAT") || "image/png";
+
+            params.set("service", "WMTS");
+            params.set("request", "GetTile");
+            params.set("version", params.get("version") || params.get("VERSION") || "1.0.0");
+            if (layer) params.set("layer", layer);
+            params.set("style", style);
+            params.set("tilematrixset", tileMatrixSet);
+            params.set("format", format);
+
+            return `${base}?${params.toString()}&TileMatrix={z}&TileRow={y}&TileCol={x}`;
         } catch (e) {
             return cleanUrl;
         }
@@ -1147,6 +1252,8 @@ export class Visual implements IVisual {
             countBadge.className = "layer-count";
             if (layer.type === "wms") {
                 countBadge.textContent = "WMS";
+            } else if (layer.type === "wmts") {
+                countBadge.textContent = "WMTS";
             } else if (layer.type === "wfs") {
                 countBadge.textContent = layer.count > 0 ? `${layer.count}` : "WFS";
             } else {

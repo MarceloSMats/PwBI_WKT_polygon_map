@@ -14,12 +14,13 @@ Visual customizado simplificado e de alta performance para o Microsoft Power BI,
    - **Cores Automáticas por Camada**: cada camada recebe automaticamente uma cor distinta e harmônica quando não houver formatação condicional específica.
    - O tooltip exibe em destaque a qual camada o polígono pertence.
 
-2. **Camadas Externas OGC (WMS e WFS)**:
-   - Permite adicionar uma camada externa a partir de um link **WMS (Web Map Service)** ou **WFS (Web Feature Service)**.
+2. **Camadas Externas OGC (WMS, WMTS e WFS)**:
+   - Permite adicionar uma camada externa a partir de um link **WMS (Web Map Service)**, **WMTS (Web Map Tile Service)** ou **WFS (Web Feature Service)**.
    - A camada externa é integrada ao mapa e ao seletor de camadas ("como outra camada"), permitindo ligar e desligar pelo painel interativo.
-   - **WMS (Raster / Tiles)**: renderiza imagens georreferenciadas transparentes (GeoServer, ArcGIS Server, MapServer, IBGE, INPE, etc.) com controle de versão, transparência e opacidade.
+   - **WMS (Raster Dinâmico)**: renderiza imagens georreferenciadas transparentes (GeoServer, ArcGIS Server, MapServer, IBGE, INPE, etc.) com controle de versão, transparência e opacidade.
+   - **WMTS (Tiles Pré-renderizados)**: alta performance com pirâmides de tiles em cache (padrão KVP com `GetTile` ou modelos de URL RESTful com `{z}/{x}/{y}`).
    - **WFS (Vetorial GeoJSON)**: baixa e renderiza feições vetoriais (pontos, linhas e polígonos) com cor e borda personalizáveis e tooltips interativos mostrando os atributos da feição.
-   - **Detecção Inteligente de Link**: aceita tanto a URL base do serviço com o nome da camada em campo separado, quanto a URL completa já contendo parâmetros como `layers=` ou `typeName=`.
+   - **Detecção Inteligente de Link**: aceita tanto URLs base quanto URLs completas com parâmetros ou padrões de tiles.
 
 3. **Suporte Nativo e Automático a WKT**:
    - Suporta `POLYGON` e `MULTIPOLYGON`.
@@ -66,12 +67,12 @@ Visual customizado simplificado e de alta performance para o Microsoft Power BI,
    - **Categoria / Nome** *(opcional)*: Arraste as colunas de nome correspondentes.
    - **Cor de Preenchimento** *(opcional)*: Medida ou coluna com código `#HEX`.
    - **Dicas de Ferramenta** *(opcional)*: Medidas ou colunas adicionais.
-5. **Para Adicionar uma Camada Externa WMS ou WFS**:
-   - No painel de **Formatação do Visual** (ícone de pincel), abra a seção **Camada WMS / WFS (Externa)**.
+5. **Para Adicionar uma Camada Externa (WMS, WMTS ou WFS)**:
+   - No painel de **Formatação do Visual** (ícone de pincel), abra a seção **Camada Externa (WMS / WMTS / WFS)**.
    - Marque **Ativar Camada Externa**.
-   - Escolha o **Tipo de Serviço** (`WMS` ou `WFS`).
-   - Insira o **Link / URL do Serviço** (ex: `https://geoservicos.ibge.gov.br/geoserver/wms` ou URL completa do GeoServer).
-   - Opcionalmente informe o **Nome da Camada** (ex: `CGEO:C2010_UF`).
+   - Escolha o **Tipo de Serviço** (`WMS`, `WMTS` ou `WFS`).
+   - Insira o **Link / URL do Serviço** (ex: URL base ou com template `{z}/{x}/{y}`).
+   - Opcionalmente informe o **Nome da Camada** (ex: `workspace:camada`).
    - Ajuste a **Opacidade (%)** e o estilo desejado.
    - A camada aparecerá no mapa e fará parte do controle de camadas caso haja mais de uma camada ativa!
 

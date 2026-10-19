@@ -19,6 +19,8 @@ export declare class Visual implements IVisual {
     private currentBasemapKey;
     private currentWmsLayer;
     private currentWmsKey;
+    private currentWmtsLayer;
+    private currentWmtsKey;
     private cachedWfsUrl;
     private cachedWfsGeoJson;
     private isFetchingWfs;
@@ -41,6 +43,7 @@ export declare class Visual implements IVisual {
     private populateWfsFeatures;
     private parseWmsUrl;
     private buildWfsUrl;
+    private parseWmtsUrl;
     private renderPolygons;
     private renderLayerControl;
     private toggleAllLayers;

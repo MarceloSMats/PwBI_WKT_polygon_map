@@ -146,7 +146,7 @@ export class LayerConfigCardSettings extends FormattingSettingsCard {
 
 export class WmsConfigCardSettings extends FormattingSettingsCard {
     name = "wmsConfig";
-    displayName = "Camada WMS / WFS (Externa)";
+    displayName = "Camada Externa (WMS / WMTS / WFS)";
 
     enabled = new formattingSettings.ToggleSwitch({
         name: "enabled",
@@ -163,14 +163,14 @@ export class WmsConfigCardSettings extends FormattingSettingsCard {
     layerTitle = new formattingSettings.TextInput({
         name: "layerTitle",
         displayName: "Nome de Exibição da Camada",
-        placeholder: "Ex: Camada WMS / WFS",
-        value: "Camada WMS/WFS"
+        placeholder: "Ex: Camada Externa",
+        value: "Camada Externa"
     });
 
     url = new formattingSettings.TextInput({
         name: "url",
-        displayName: "Link / URL do Serviço (WMS ou WFS)",
-        placeholder: "https://.../geoserver/wms ou wfs",
+        displayName: "Link / URL do Serviço (WMS, WMTS ou WFS)",
+        placeholder: "https://.../wmts ou wms ou wfs",
         value: ""
     });
 
