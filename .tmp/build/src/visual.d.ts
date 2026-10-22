@@ -17,6 +17,16 @@ export declare class Visual implements IVisual {
     private map;
     private currentTileLayer;
     private currentBasemapKey;
+    private canvasRenderer;
+    private svgRenderer;
+    private labelLayerGroup;
+    private wktCache;
+    private centroidCache;
+    private boundsCache;
+    private lastTooltipTime;
+    private isFetchingMore;
+    private totalAccumulatedRows;
+    private currentRenderedCount;
     private currentWmsLayer;
     private currentWmsKey;
     private currentWmtsLayer;
@@ -36,6 +46,11 @@ export declare class Visual implements IVisual {
     private updateTileLayer;
     update(options: VisualUpdateOptions): void;
     private parseData;
+    private getCachedOrParseWkt;
+    private getDashArray;
+    private getPolygonCentroid;
+    private getGeometryBounds;
+    private getCachedGeometryBounds;
     private parseWktToGeoJsonGeometry;
     private fallbackParseWkt;
     private invertGeometryCoordinates;
@@ -45,10 +60,14 @@ export declare class Visual implements IVisual {
     private buildWfsUrl;
     private parseWmtsUrl;
     private renderPolygons;
+    private updateVisiblePolygons;
     private renderLayerControl;
     private toggleAllLayers;
     private updateLegendCount;
     private fitBoundsToVisibleLayers;
+    private resetItemStyle;
     private applySelectionStyles;
+    private renderLabels;
+    private updateLabelsVisibility;
     getFormattingModel(): powerbi.visuals.FormattingModel;
 }

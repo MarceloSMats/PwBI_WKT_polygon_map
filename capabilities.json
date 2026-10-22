@@ -23,6 +23,12 @@
             "name": "tooltips",
             "kind": "Measure",
             "description": "Medidas ou valores adicionais para exibir no tooltip"
+        },
+        {
+            "displayName": "Tamanho / Área / Prioridade (LOD)",
+            "name": "polygonSize",
+            "kind": "GroupingOrMeasure",
+            "description": "Coluna ou medida com a área (ex: hectares, m²) ou tamanho. Quando vinculada e classificada decrescente, o Power BI seleciona automaticamente os maiores polígonos de TODO o Brasil."
         }
     ],
     "objects": {
@@ -215,6 +221,29 @@
                     "type": {
                         "bool": true
                     }
+                },
+                "renderEngine": {
+                    "displayName": "Motor de Renderização",
+                    "description": "Canvas (alta performance e fluidez) ou SVG nativo",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "canvas",
+                                "displayName": "Canvas (Alta Performance - Recomendado)"
+                            },
+                            {
+                                "value": "svg",
+                                "displayName": "SVG (Padrão Vetorial)"
+                            }
+                        ]
+                    }
+                },
+                "smoothFactor": {
+                    "displayName": "Simplificação de Linhas (Performance)",
+                    "description": "Fator de simplificação dinâmica das geometrias durante zoom (0 desativa)",
+                    "type": {
+                        "numeric": true
+                    }
                 }
             }
         },
@@ -259,6 +288,59 @@
                         "numeric": true
                     }
                 },
+                "strokeDashArray": {
+                    "displayName": "Padrão da Borda",
+                    "description": "Estilo da linha do contorno",
+                    "type": {
+                        "enumeration": [
+                            {
+                                "value": "solid",
+                                "displayName": "Sólida (Contínua)"
+                            },
+                            {
+                                "value": "dashed",
+                                "displayName": "Tracejada"
+                            },
+                            {
+                                "value": "dotted",
+                                "displayName": "Pontilhada"
+                            },
+                            {
+                                "value": "dash-dot",
+                                "displayName": "Traço-Ponto"
+                            }
+                        ]
+                    }
+                },
+                "enableHover": {
+                    "displayName": "Destaque ao Passar o Mouse",
+                    "description": "Realça visualmente o polígono sob o cursor do mouse",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "hoverStrokeColor": {
+                    "displayName": "Cor da Borda no Destaque",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "hoverStrokeWidth": {
+                    "displayName": "Espessura da Borda no Destaque (px)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "hoverFillOpacity": {
+                    "displayName": "Opacidade no Destaque (%)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
                 "highlightColor": {
                     "displayName": "Cor de Seleção / Destaque",
                     "type": {
@@ -271,6 +353,41 @@
                 },
                 "unselectedOpacity": {
                     "displayName": "Opacidade ao Desmarcar (%)",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
+        },
+        "labelConfig": {
+            "displayName": "Rótulos dos Polígonos (Labels)",
+            "properties": {
+                "showLabels": {
+                    "displayName": "Exibir Rótulos no Mapa",
+                    "description": "Exibe o nome ou categoria centralizado em cada polígono",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "fontSize": {
+                    "displayName": "Tamanho da Fonte (pt)",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "fontColor": {
+                    "displayName": "Cor do Texto",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "minZoom": {
+                    "displayName": "Zoom Mínimo de Exibição",
+                    "description": "Oculta os rótulos em zooms afastados para manter o mapa limpo",
                     "type": {
                         "numeric": true
                     }
@@ -293,6 +410,53 @@
                     }
                 }
             }
+        },
+        "lodConfig": {
+            "displayName": "Performance & Zoom Dinâmico (LOD)",
+            "properties": {
+                "enableLod": {
+                    "displayName": "Ativar LOD (Level of Detail)",
+                    "description": "Exibe polígonos maiores primeiro em zoom afastado e polígonos menores ao aproximar",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "minPixelSize": {
+                    "displayName": "Tamanho Mínimo na Tela (px)",
+                    "description": "Polígonos menores que este valor em pixels são ocultados em zoom aberto para manter alta fluidez",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "enableViewportCulling": {
+                    "displayName": "Ocultar Polígonos Fora da Tela (Culling)",
+                    "description": "Renderiza apenas as feições contidas na área visível da tela",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "maxPolygonsOnScreen": {
+                    "displayName": "Limite de Polígonos na Tela",
+                    "description": "Quantidade máxima de polígonos desenhados simultaneamente na tela",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "autoFetchMore": {
+                    "displayName": "Carregamento Contínuo (Streaming)",
+                    "description": "Solicita mais fatias de dados ao Power BI além das 30.000 iniciais",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "maxTotalRows": {
+                    "displayName": "Limite Máximo de Registros",
+                    "description": "Teto máximo de feições acumuladas via streaming (ex: 100000)",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
         }
     },
     "dataViewMappings": [
@@ -302,7 +466,8 @@
                     "wkt": { "min": 0, "max": 20 },
                     "category": { "max": 10 },
                     "fillColor": { "max": 1 },
-                    "tooltips": { "max": 20 }
+                    "tooltips": { "max": 20 },
+                    "polygonSize": { "max": 1 }
                 }
             ],
             "categorical": {
@@ -320,7 +485,7 @@
                         }
                     ],
                     "dataReductionAlgorithm": {
-                        "top": {
+                        "window": {
                             "count": 30000
                         }
                     }
@@ -336,12 +501,20 @@
                             "bind": {
                                 "to": "tooltips"
                             }
+                        },
+                        {
+                            "bind": {
+                                "to": "polygonSize"
+                            }
                         }
                     ]
                 }
             }
         }
     ],
+    "sorting": {
+        "default": {}
+    },
     "supportsHighlight": true,
     "privileges": [
         {

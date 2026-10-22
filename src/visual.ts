@@ -54,6 +54,14 @@ interface PolygonItem {
     tooltips: VisualTooltipDataItem[];
     geoJson: GeoJSON.Feature<GeoJSON.Geometry, any>;
     layer?: L.Path;
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+    centerLat: number;
+    centerLng: number;
+    diagonalDegrees: number;
+    polygonSize?: number;
 }
 
 export class Visual implements IVisual {
@@ -71,6 +79,18 @@ export class Visual implements IVisual {
     private map: L.Map | null = null;
     private currentTileLayer: L.TileLayer | null = null;
     private currentBasemapKey = "";
+
+    // Dedicated renderers & caches for high performance
+    private canvasRenderer: L.Canvas | null = null;
+    private svgRenderer: L.SVG | null = null;
+    private labelLayerGroup: L.LayerGroup = L.layerGroup();
+    private wktCache: Map<string, GeoJSON.Geometry | null> = new Map();
+    private centroidCache: Map<string, [number, number] | null> = new Map();
+    private boundsCache: Map<string, { minLat: number; maxLat: number; minLng: number; maxLng: number; centerLat: number; centerLng: number; diagonalDegrees: number; } | null> = new Map();
+    private lastTooltipTime = 0;
+    private isFetchingMore = false;
+    private totalAccumulatedRows = 0;
+    private currentRenderedCount = 0;
 
     // External Layer (WMS / WMTS / WFS) properties
     private currentWmsLayer: L.TileLayer.WMS | null = null;
@@ -146,7 +166,17 @@ export class Visual implements IVisual {
             center: [-15.7801, -47.9292], // Default Brazil
             zoom: 4,
             zoomControl: true,
-            attributionControl: true
+            attributionControl: true,
+            preferCanvas: true
+        });
+
+        this.canvasRenderer = L.canvas({ padding: 0.5, tolerance: 8 });
+        this.svgRenderer = L.svg({ padding: 0.5 });
+        this.labelLayerGroup.addTo(this.map);
+
+        this.map.on("moveend zoomend", () => {
+            this.updateVisiblePolygons();
+            this.updateLabelsVisibility();
         });
 
         this.updateTileLayer("carto-light");
@@ -219,6 +249,17 @@ export class Visual implements IVisual {
     }
 
     public update(options: VisualUpdateOptions) {
+        // Fast path: If purely a resize or viewport event, adjust leaflet canvas size without re-parsing/re-rendering
+        const isOnlyResize = (options.type === powerbi.VisualUpdateType.Resize || options.type === powerbi.VisualUpdateType.ResizeEnd)
+            && !(options.type & powerbi.VisualUpdateType.Data);
+
+        if (isOnlyResize) {
+            if (this.map) {
+                this.map.invalidateSize();
+            }
+            return;
+        }
+
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
             VisualFormattingSettingsModel,
             options.dataViews?.[0]
@@ -238,6 +279,32 @@ export class Visual implements IVisual {
         this.updateExternalLayer();
         this.renderPolygons();
         this.renderLayerControl();
+
+        // Progressive streaming (fetchMoreData)
+        const dataView = options.dataViews?.[0];
+        const autoFetch = this.formattingSettings?.lodConfig?.autoFetchMore?.value ?? true;
+        const maxRowsLimit = (this.formattingSettings?.lodConfig?.maxTotalRows?.value ?? 100000) as number;
+
+        const currentRowsCount = dataView?.categorical?.categories?.[0]?.values?.length
+            || dataView?.table?.rows?.length
+            || 0;
+        this.totalAccumulatedRows = currentRowsCount;
+
+        if (autoFetch && dataView?.metadata?.segment && currentRowsCount < maxRowsLimit && !this.isFetchingMore) {
+            this.isFetchingMore = true;
+            setTimeout(() => {
+                try {
+                    const more = this.host.fetchMoreData(true);
+                    if (!more) {
+                        this.isFetchingMore = false;
+                    }
+                } catch (e) {
+                    this.isFetchingMore = false;
+                }
+            }, 60);
+        } else if (!dataView?.metadata?.segment || currentRowsCount >= maxRowsLimit) {
+            this.isFetchingMore = false;
+        }
     }
 
     private parseData(options: VisualUpdateOptions) {
@@ -291,14 +358,17 @@ export class Visual implements IVisual {
                 }
             }
 
-            // Identify fill color and tooltip value columns
+            // Identify fill color, polygonSize, and tooltip value columns
             let fillColorCol: powerbi.DataViewValueColumn | undefined;
+            let polygonSizeCol: powerbi.DataViewValueColumn | undefined;
             const extraTooltipCols: powerbi.DataViewValueColumn[] = [];
 
             if (values) {
                 for (const v of values) {
                     if (v.source.roles && v.source.roles["fillColor"]) {
                         fillColorCol = v;
+                    } else if (v.source.roles && v.source.roles["polygonSize"]) {
+                        polygonSizeCol = v;
                     } else {
                         extraTooltipCols.push(v);
                     }
@@ -373,10 +443,25 @@ export class Visual implements IVisual {
                         value: categoryName
                     });
 
+                    let sizeVal: number | undefined;
+                    if (polygonSizeCol && polygonSizeCol.values[i] != null) {
+                        const parsed = Number(polygonSizeCol.values[i]);
+                        if (!isNaN(parsed)) {
+                            sizeVal = parsed;
+                        }
+                    }
+
                     if (fillColorCol) {
                         tooltips.push({
                             displayName: fillColorCol.source.displayName,
                             value: String(fillColorCol.values[i] ?? "-")
+                        });
+                    }
+
+                    if (polygonSizeCol) {
+                        tooltips.push({
+                            displayName: polygonSizeCol.source.displayName || "Tamanho / Área",
+                            value: sizeVal != null ? sizeVal.toLocaleString() : String(polygonSizeCol.values[i] ?? "-")
                         });
                     }
 
@@ -394,8 +479,11 @@ export class Visual implements IVisual {
                         });
                     }
 
-                    const geom = this.parseWktToGeoJsonGeometry(rawWkt, invertCoords);
+                    const geom = this.getCachedOrParseWkt(rawWkt, invertCoords);
                     if (geom) {
+                        const bounds = this.getCachedGeometryBounds(rawWkt, geom);
+                        if (!bounds) continue;
+
                         const feature: GeoJSON.Feature<GeoJSON.Geometry, any> = {
                             type: "Feature",
                             id: `${layerId}_${i}`,
@@ -418,7 +506,15 @@ export class Visual implements IVisual {
                             fillColor: color,
                             selectionId: selectionId,
                             tooltips: tooltips,
-                            geoJson: feature
+                            geoJson: feature,
+                            minLat: bounds.minLat,
+                            maxLat: bounds.maxLat,
+                            minLng: bounds.minLng,
+                            maxLng: bounds.maxLng,
+                            centerLat: bounds.centerLat,
+                            centerLng: bounds.centerLng,
+                            diagonalDegrees: bounds.diagonalDegrees,
+                            polygonSize: sizeVal
                         });
 
                         layerConfig.count++;
@@ -438,6 +534,7 @@ export class Visual implements IVisual {
             const wktColIndices: number[] = [];
             let catColIdx = -1;
             let fillColIdx = -1;
+            let sizeColIdx = -1;
             const tooltipColIndices: number[] = [];
 
             for (let c = 0; c < columns.length; c++) {
@@ -446,6 +543,7 @@ export class Visual implements IVisual {
                     if (col.roles["wkt"]) wktColIndices.push(c);
                     else if (col.roles["category"]) catColIdx = c;
                     else if (col.roles["fillColor"]) fillColIdx = c;
+                    else if (col.roles["polygonSize"]) sizeColIdx = c;
                     else if (col.roles["tooltips"]) tooltipColIndices.push(c);
                 }
             }
@@ -502,14 +600,31 @@ export class Visual implements IVisual {
                         .withTable(table, i)
                         .createSelectionId();
 
+                    let sizeVal: number | undefined;
+                    if (sizeColIdx !== -1 && row[sizeColIdx] != null) {
+                        const parsed = Number(row[sizeColIdx]);
+                        if (!isNaN(parsed)) {
+                            sizeVal = parsed;
+                        }
+                    }
+
                     const tooltips: VisualTooltipDataItem[] = [];
                     if (multiLayers) {
                         tooltips.push({ displayName: "Camada", value: layerName });
                     }
                     tooltips.push({ displayName: catColIdx !== -1 ? columns[catColIdx].displayName : "Categoria", value: categoryName });
+                    if (sizeColIdx !== -1) {
+                        tooltips.push({
+                            displayName: columns[sizeColIdx].displayName || "Tamanho / Área",
+                            value: sizeVal != null ? sizeVal.toLocaleString() : String(row[sizeColIdx] ?? "-")
+                        });
+                    }
 
-                    const geom = this.parseWktToGeoJsonGeometry(rawWkt, invertCoords);
+                    const geom = this.getCachedOrParseWkt(rawWkt, invertCoords);
                     if (geom) {
+                        const bounds = this.getCachedGeometryBounds(rawWkt, geom);
+                        if (!bounds) continue;
+
                         this.items.push({
                             index: i,
                             layerId: layerId,
@@ -524,13 +639,142 @@ export class Visual implements IVisual {
                                 id: `${layerId}_${i}`,
                                 geometry: geom,
                                 properties: { index: i, layerId, layerName, category: categoryName, fillColor: color }
-                            }
+                            },
+                            minLat: bounds.minLat,
+                            maxLat: bounds.maxLat,
+                            minLng: bounds.minLng,
+                            maxLng: bounds.maxLng,
+                            centerLat: bounds.centerLat,
+                            centerLng: bounds.centerLng,
+                            diagonalDegrees: bounds.diagonalDegrees,
+                            polygonSize: sizeVal
                         });
                         layerConfig.count++;
                     }
                 }
             }
         }
+    }
+
+    private getCachedOrParseWkt(rawWkt: string, invertCoords: boolean): GeoJSON.Geometry | null {
+        const cacheKey = `${invertCoords ? "inv:" : "std:"}${rawWkt}`;
+        if (this.wktCache.has(cacheKey)) {
+            return this.wktCache.get(cacheKey)!;
+        }
+
+        const geom = this.parseWktToGeoJsonGeometry(rawWkt, invertCoords);
+
+        // Safety limit to avoid unbounded memory usage
+        if (this.wktCache.size > 25000) {
+            this.wktCache.clear();
+            this.centroidCache.clear();
+        }
+
+        this.wktCache.set(cacheKey, geom);
+        return geom;
+    }
+
+    private getDashArray(style: string): string | undefined {
+        switch (style) {
+            case "dashed": return "6, 6";
+            case "dotted": return "2, 5";
+            case "dash-dot": return "8, 4, 2, 4";
+            case "solid":
+            default: return undefined;
+        }
+    }
+
+    private getPolygonCentroid(geom: GeoJSON.Geometry): [number, number] | null {
+        if (!geom) return null;
+        try {
+            if (geom.type === "Polygon") {
+                const coords = (geom as GeoJSON.Polygon).coordinates[0];
+                if (!coords || coords.length === 0) return null;
+                let sumLng = 0;
+                let sumLat = 0;
+                const n = coords.length;
+                for (let i = 0; i < n; i++) {
+                    sumLng += coords[i][0];
+                    sumLat += coords[i][1];
+                }
+                return [sumLat / n, sumLng / n];
+            } else if (geom.type === "MultiPolygon") {
+                const polygons = (geom as GeoJSON.MultiPolygon).coordinates;
+                if (!polygons || polygons.length === 0) return null;
+                let bestRing = polygons[0][0];
+                let maxLen = bestRing.length;
+                for (let p = 1; p < polygons.length; p++) {
+                    if (polygons[p][0] && polygons[p][0].length > maxLen) {
+                        bestRing = polygons[p][0];
+                        maxLen = bestRing.length;
+                    }
+                }
+                let sumLng = 0;
+                let sumLat = 0;
+                const n = bestRing.length;
+                for (let i = 0; i < n; i++) {
+                    sumLng += bestRing[i][0];
+                    sumLat += bestRing[i][1];
+                }
+                return [sumLat / n, sumLng / n];
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    }
+
+    private getGeometryBounds(geom: GeoJSON.Geometry): {
+        minLat: number; maxLat: number; minLng: number; maxLng: number; centerLat: number; centerLng: number; diagonalDegrees: number;
+    } | null {
+        if (!geom) return null;
+        let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+
+        const scanCoords = (coords: any) => {
+            if (!coords) return;
+            if (typeof coords[0] === "number" && typeof coords[1] === "number") {
+                const lng = coords[0];
+                const lat = coords[1];
+                if (lng < minLng) minLng = lng;
+                if (lng > maxLng) maxLng = lng;
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
+            } else if (Array.isArray(coords)) {
+                for (let i = 0; i < coords.length; i++) {
+                    scanCoords(coords[i]);
+                }
+            }
+        };
+
+        try {
+            scanCoords((geom as any).coordinates);
+        } catch (e) {
+            return null;
+        }
+
+        if (minLng === Infinity || minLat === Infinity) return null;
+
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        const dLat = maxLat - minLat;
+        const dLng = maxLng - minLng;
+        const diagonalDegrees = Math.sqrt(dLat * dLat + dLng * dLng);
+
+        return { minLat, maxLat, minLng, maxLng, centerLat, centerLng, diagonalDegrees };
+    }
+
+    private getCachedGeometryBounds(wkt: string, geom: GeoJSON.Geometry) {
+        if (this.boundsCache.has(wkt)) {
+            return this.boundsCache.get(wkt);
+        }
+        const bounds = this.getGeometryBounds(geom);
+        if (this.boundsCache.size > 25000) {
+            this.boundsCache.clear();
+        }
+        if (bounds) {
+            this.boundsCache.set(wkt, bounds);
+        }
+        return bounds;
     }
 
     private parseWktToGeoJsonGeometry(rawWkt: string, invertCoords: boolean): GeoJSON.Geometry | null {
@@ -1042,7 +1286,7 @@ export class Visual implements IVisual {
     private renderPolygons() {
         if (!this.map) return;
 
-        // Clean previous layer groups from map
+        // Clean previous layer groups and labels from map
         this.layers.forEach(l => {
             if (this.map?.hasLayer(l.leafletLayer)) {
                 this.map.removeLayer(l.leafletLayer);
@@ -1056,29 +1300,135 @@ export class Visual implements IVisual {
         if (this.items.length === 0 && !hasExternalLayer) {
             this.emptyStateElement.style.display = "block";
             this.legendElement.style.display = "none";
+            this.labelLayerGroup.clearLayers();
             return;
         }
 
         this.emptyStateElement.style.display = "none";
         this.legendElement.style.display = "flex";
 
+        // Add visible layers to map
+        this.layers.forEach(layer => {
+            if (layer.visible && this.map) {
+                layer.leafletLayer.addTo(this.map);
+            }
+        });
+
+        // Auto Fit on initial load or if enabled
+        const autoFit = this.formattingSettings?.mapConfig?.autoFit?.value ?? true;
+        if (autoFit && (!this.hasInitialFitDone || this.items.length > 0)) {
+            this.fitBoundsToVisibleLayers();
+            this.hasInitialFitDone = true;
+        }
+
+        this.updateVisiblePolygons();
+        this.renderLabels();
+    }
+
+    private updateVisiblePolygons() {
+        if (!this.map) return;
+
+        // Clear existing vector features in all wkt layers
+        this.layers.forEach(l => {
+            if (l.type === "wkt" && l.leafletGroup) {
+                l.leafletGroup.clearLayers();
+            }
+        });
+
+        if (this.items.length === 0) {
+            this.currentRenderedCount = 0;
+            this.updateLegendCount();
+            return;
+        }
+
+        const bounds = this.map.getBounds();
+        const north = bounds.getNorth();
+        const south = bounds.getSouth();
+        const east = bounds.getEast();
+        const west = bounds.getWest();
+        const centerLat = bounds.getCenter().lat;
+        const zoom = this.map.getZoom();
+
+        const enableLod = this.formattingSettings?.lodConfig?.enableLod?.value ?? true;
+        const minPixelSize = (this.formattingSettings?.lodConfig?.minPixelSize?.value ?? 4) as number;
+        const enableCulling = this.formattingSettings?.lodConfig?.enableViewportCulling?.value ?? true;
+        const maxPolygons = (this.formattingSettings?.lodConfig?.maxPolygonsOnScreen?.value ?? 10000) as number;
+
+        const pxPerDegLng = (256 * Math.pow(2, zoom) * Math.cos(centerLat * Math.PI / 180)) / 360;
+        const pxPerDegLat = (256 * Math.pow(2, zoom)) / 360;
+
+        const candidates: PolygonItem[] = [];
+
+        for (const item of this.items) {
+            const layerConfig = this.layers.get(item.layerId);
+            if (!layerConfig || !layerConfig.visible) continue;
+
+            const isSelected = this.selectedIds.has(item.selectionId.getKey());
+
+            // 1. Viewport Culling check (always show if selected)
+            if (enableCulling && !isSelected) {
+                const inViewport = !(
+                    item.maxLat < south ||
+                    item.minLat > north ||
+                    item.maxLng < west ||
+                    item.minLng > east
+                );
+                if (!inViewport) continue;
+            }
+
+            // 2. Level of Detail (LOD) check: screen pixel size (always show if selected)
+            if (enableLod && !isSelected) {
+                const widthPx = (item.maxLng - item.minLng) * pxPerDegLng;
+                const heightPx = (item.maxLat - item.minLat) * pxPerDegLat;
+                const maxDimPx = Math.max(widthPx, heightPx);
+                if (maxDimPx < minPixelSize) {
+                    continue;
+                }
+            }
+
+            candidates.push(item);
+        }
+
+        // 3. Keep largest if candidates exceed maxPolygons
+        let itemsToRender = candidates;
+        if (candidates.length > maxPolygons) {
+            candidates.sort((a, b) => {
+                const valA = a.polygonSize != null && a.polygonSize > 0 ? a.polygonSize : a.diagonalDegrees;
+                const valB = b.polygonSize != null && b.polygonSize > 0 ? b.polygonSize : b.diagonalDegrees;
+                return valB - valA;
+            });
+            itemsToRender = candidates.slice(0, maxPolygons);
+        }
+
+        this.currentRenderedCount = itemsToRender.length;
+
+        const renderEngine = (this.formattingSettings?.mapConfig?.renderEngine?.value as string) || "canvas";
+        const isCanvas = renderEngine !== "svg";
+        const renderer = (isCanvas ? this.canvasRenderer : this.svgRenderer) || undefined;
+        const smoothFactorVal = (this.formattingSettings?.mapConfig?.smoothFactor?.value ?? 1.0) as number;
+
         const fillOpacityVal = ((this.formattingSettings?.polygonConfig?.fillOpacity?.value ?? 60) as number) / 100;
         const strokeColorVal = this.formattingSettings?.polygonConfig?.strokeColor?.value?.value || "#1d4ed8";
         const strokeWidthVal = (this.formattingSettings?.polygonConfig?.strokeWidth?.value ?? 2) as number;
         const strokeOpacityVal = ((this.formattingSettings?.polygonConfig?.strokeOpacity?.value ?? 100) as number) / 100;
+        const strokeDashStyle = (this.formattingSettings?.polygonConfig?.strokeDashArray?.value as string) || "solid";
+        const dashArrayVal = this.getDashArray(strokeDashStyle);
 
-        for (const item of this.items) {
+        for (const item of itemsToRender) {
             const layerConfig = this.layers.get(item.layerId);
             if (!layerConfig || !layerConfig.leafletGroup) continue;
 
             const geoJsonLayer = L.geoJSON(item.geoJson, {
                 style: () => ({
+                    renderer: renderer,
+                    smoothFactor: smoothFactorVal,
                     fillColor: item.fillColor,
                     fillOpacity: fillOpacityVal,
                     color: strokeColorVal,
                     weight: strokeWidthVal,
-                    opacity: strokeOpacityVal
-                }),
+                    opacity: strokeOpacityVal,
+                    dashArray: dashArrayVal
+                } as L.PathOptions),
                 onEachFeature: (_, layer) => {
                     item.layer = layer as L.Path;
 
@@ -1093,9 +1443,32 @@ export class Visual implements IVisual {
                         });
                     });
 
+                    layer.on("mouseover", () => {
+                        const enableHover = this.formattingSettings?.polygonConfig?.enableHover?.value ?? true;
+                        if (!enableHover) return;
+
+                        const isSelected = this.selectedIds.has(item.selectionId.getKey());
+                        if (isSelected) return;
+
+                        const hoverStrokeColor = this.formattingSettings?.polygonConfig?.hoverStrokeColor?.value?.value || "#2563eb";
+                        const hoverStrokeWidth = (this.formattingSettings?.polygonConfig?.hoverStrokeWidth?.value ?? 3) as number;
+                        const hoverFillOpacity = ((this.formattingSettings?.polygonConfig?.hoverFillOpacity?.value ?? 80) as number) / 100;
+
+                        (layer as L.Path).setStyle({
+                            color: hoverStrokeColor,
+                            weight: hoverStrokeWidth,
+                            fillOpacity: hoverFillOpacity,
+                            dashArray: dashArrayVal
+                        });
+                    });
+
                     layer.on("mousemove", (e: L.LeafletMouseEvent) => {
                         const showTooltip = this.formattingSettings?.tooltipConfig?.showTooltip?.value ?? true;
                         if (!showTooltip) return;
+
+                        const now = Date.now();
+                        if (now - this.lastTooltipTime < 35) return;
+                        this.lastTooltipTime = now;
 
                         this.tooltipService.show({
                             coordinates: [e.originalEvent.clientX, e.originalEvent.clientY],
@@ -1110,6 +1483,12 @@ export class Visual implements IVisual {
                             isTouchEvent: false,
                             immediately: true
                         });
+
+                        const enableHover = this.formattingSettings?.polygonConfig?.enableHover?.value ?? true;
+                        if (!enableHover) return;
+
+                        const isSelected = this.selectedIds.has(item.selectionId.getKey());
+                        this.resetItemStyle(item, isSelected);
                     });
                 }
             });
@@ -1117,22 +1496,8 @@ export class Visual implements IVisual {
             layerConfig.leafletGroup.addLayer(geoJsonLayer);
         }
 
-        // Add visible layers to map
-        this.layers.forEach(layer => {
-            if (layer.visible && this.map) {
-                layer.leafletLayer.addTo(this.map);
-            }
-        });
-
         this.applySelectionStyles();
         this.updateLegendCount();
-
-        // Auto Fit on initial load or if enabled
-        const autoFit = this.formattingSettings?.mapConfig?.autoFit?.value ?? true;
-        if (autoFit && (!this.hasInitialFitDone || this.items.length > 0)) {
-            this.fitBoundsToVisibleLayers();
-            this.hasInitialFitDone = true;
-        }
     }
 
     private renderLayerControl() {
@@ -1283,6 +1648,7 @@ export class Visual implements IVisual {
                 }
 
                 this.updateLegendCount();
+                this.renderLabels();
 
                 const autoFitOnToggle = this.formattingSettings?.layerConfig?.autoFitOnToggle?.value ?? false;
                 if (autoFitOnToggle && layer.visible) {
@@ -1336,6 +1702,7 @@ export class Visual implements IVisual {
         });
 
         this.updateLegendCount();
+        this.renderLabels();
         this.renderLayerControl();
 
         const autoFitOnToggle = this.formattingSettings?.layerConfig?.autoFitOnToggle?.value ?? false;
@@ -1345,12 +1712,12 @@ export class Visual implements IVisual {
     }
 
     private updateLegendCount() {
-        let totalVisiblePolygons = 0;
+        let totalPolygons = 0;
         let activeLayersCount = 0;
 
         this.layers.forEach(layer => {
             if (layer.visible) {
-                totalVisiblePolygons += layer.count;
+                totalPolygons += layer.count;
                 activeLayersCount++;
             }
         });
@@ -1359,12 +1726,17 @@ export class Visual implements IVisual {
 
         const badge = document.createElement("span");
         badge.className = "legend-badge";
-        badge.textContent = String(totalVisiblePolygons);
+        badge.textContent = this.currentRenderedCount.toLocaleString();
         this.legendElement.appendChild(badge);
 
         const label = document.createElement("span");
-        if (totalVisiblePolygons > 0) {
-            label.textContent = ` polígonos visíveis (${activeLayersCount}/${this.layers.size} camadas)`;
+        const isStreaming = this.isFetchingMore;
+        const lodActive = this.formattingSettings?.lodConfig?.enableLod?.value ?? true;
+
+        if (totalPolygons > 0) {
+            const lodText = lodActive && this.currentRenderedCount < totalPolygons ? " • LOD ativo" : "";
+            const streamText = isStreaming ? " • Carregando mais..." : "";
+            label.textContent = ` de ${totalPolygons.toLocaleString()} polígonos no visor (${activeLayersCount}/${this.layers.size} camadas)${lodText}${streamText}`;
         } else {
             label.textContent = ` (${activeLayersCount}/${this.layers.size} camadas ativas)`;
         }
@@ -1376,18 +1748,28 @@ export class Visual implements IVisual {
 
         let combinedBounds: L.LatLngBounds | null = null;
 
-        this.layers.forEach(layer => {
-            if (layer.visible && layer.count > 0 && layer.leafletGroup) {
-                const b = layer.leafletGroup.getBounds();
-                if (b && b.isValid()) {
-                    if (!combinedBounds) {
-                        combinedBounds = L.latLngBounds(b.getSouthWest(), b.getNorthEast());
-                    } else {
-                        combinedBounds.extend(b);
-                    }
-                }
+        for (const item of this.items) {
+            const layerConfig = this.layers.get(item.layerId);
+            if (!layerConfig || !layerConfig.visible) continue;
+
+            const itemBounds = L.latLngBounds(
+                L.latLng(item.minLat, item.minLng),
+                L.latLng(item.maxLat, item.maxLng)
+            );
+            if (!combinedBounds) {
+                combinedBounds = itemBounds;
+            } else {
+                combinedBounds.extend(itemBounds);
             }
-        });
+        }
+
+        if (this.wfsLayerGroup && this.map.hasLayer(this.wfsLayerGroup)) {
+            const b = this.wfsLayerGroup.getBounds();
+            if (b && b.isValid()) {
+                if (!combinedBounds) combinedBounds = b;
+                else combinedBounds.extend(b);
+            }
+        }
 
         if (combinedBounds && (combinedBounds as L.LatLngBounds).isValid()) {
             this.map.fitBounds(combinedBounds, {
@@ -1397,50 +1779,115 @@ export class Visual implements IVisual {
         }
     }
 
-    private applySelectionStyles() {
-        if (!this.items.length) return;
+    private resetItemStyle(item: PolygonItem, isSelected: boolean) {
+        if (!item.layer) return;
 
-        const hasSelection = this.selectedIds.size > 0;
         const fillOpacityVal = ((this.formattingSettings?.polygonConfig?.fillOpacity?.value ?? 60) as number) / 100;
         const strokeColorVal = this.formattingSettings?.polygonConfig?.strokeColor?.value?.value || "#1d4ed8";
         const strokeWidthVal = (this.formattingSettings?.polygonConfig?.strokeWidth?.value ?? 2) as number;
         const strokeOpacityVal = ((this.formattingSettings?.polygonConfig?.strokeOpacity?.value ?? 100) as number) / 100;
         const highlightColorVal = this.formattingSettings?.polygonConfig?.highlightColor?.value?.value || "#f59e0b";
         const unselectedOpacityVal = ((this.formattingSettings?.polygonConfig?.unselectedOpacity?.value ?? 25) as number) / 100;
+        const strokeDashStyle = (this.formattingSettings?.polygonConfig?.strokeDashArray?.value as string) || "solid";
+        const dashArrayVal = this.getDashArray(strokeDashStyle);
 
-        for (const item of this.items) {
-            if (!item.layer) continue;
+        const hasSelection = this.selectedIds.size > 0;
 
-            const isSelected = this.selectedIds.has(item.selectionId.getKey());
-
-            if (hasSelection) {
-                if (isSelected) {
-                    item.layer.setStyle({
-                        fillColor: item.fillColor,
-                        fillOpacity: Math.min(fillOpacityVal * 1.3, 1.0),
-                        color: highlightColorVal,
-                        weight: strokeWidthVal + 2,
-                        opacity: 1.0
-                    });
-                } else {
-                    item.layer.setStyle({
-                        fillColor: item.fillColor,
-                        fillOpacity: unselectedOpacityVal,
-                        color: strokeColorVal,
-                        weight: Math.max(strokeWidthVal - 0.5, 1),
-                        opacity: 0.3
-                    });
-                }
+        if (hasSelection) {
+            if (isSelected) {
+                item.layer.setStyle({
+                    fillColor: item.fillColor,
+                    fillOpacity: Math.min(fillOpacityVal * 1.3, 1.0),
+                    color: highlightColorVal,
+                    weight: strokeWidthVal + 2,
+                    opacity: 1.0,
+                    dashArray: dashArrayVal
+                });
             } else {
                 item.layer.setStyle({
                     fillColor: item.fillColor,
-                    fillOpacity: fillOpacityVal,
+                    fillOpacity: unselectedOpacityVal,
                     color: strokeColorVal,
-                    weight: strokeWidthVal,
-                    opacity: strokeOpacityVal
+                    weight: Math.max(strokeWidthVal - 0.5, 1),
+                    opacity: 0.3,
+                    dashArray: dashArrayVal
                 });
             }
+        } else {
+            item.layer.setStyle({
+                fillColor: item.fillColor,
+                fillOpacity: fillOpacityVal,
+                color: strokeColorVal,
+                weight: strokeWidthVal,
+                opacity: strokeOpacityVal,
+                dashArray: dashArrayVal
+            });
         }
+    }
+
+    private applySelectionStyles() {
+        if (!this.items.length) return;
+
+        const hasSelection = this.selectedIds.size > 0;
+        for (const item of this.items) {
+            if (!item.layer) continue;
+            const isSelected = hasSelection && this.selectedIds.has(item.selectionId.getKey());
+            this.resetItemStyle(item, isSelected);
+        }
+    }
+
+    private renderLabels() {
+        this.labelLayerGroup.clearLayers();
+        if (!this.map) return;
+
+        const showLabels = this.formattingSettings?.labelConfig?.showLabels?.value ?? false;
+        if (!showLabels || this.items.length === 0) return;
+
+        const fontSize = (this.formattingSettings?.labelConfig?.fontSize?.value ?? 10) as number;
+        const fontColor = this.formattingSettings?.labelConfig?.fontColor?.value?.value || "#1e293b";
+        const minZoom = (this.formattingSettings?.labelConfig?.minZoom?.value ?? 6) as number;
+        const currentZoom = this.map.getZoom();
+
+        if (currentZoom < minZoom) return;
+
+        const bounds = this.map.getBounds();
+        const north = bounds.getNorth();
+        const south = bounds.getSouth();
+        const east = bounds.getEast();
+        const west = bounds.getWest();
+
+        let count = 0;
+        const maxLabels = 250;
+
+        for (const item of this.items) {
+            const layerConfig = this.layers.get(item.layerId);
+            if (!layerConfig || !layerConfig.visible) continue;
+
+            // Only label items within current viewport
+            if (item.maxLat < south || item.minLat > north || item.maxLng < west || item.minLng > east) {
+                continue;
+            }
+
+            if (count++ >= maxLabels) break;
+
+            const labelIcon = L.divIcon({
+                className: "wkt-polygon-label",
+                html: `<span style="font-size: ${fontSize}pt; color: ${fontColor};">${item.category}</span>`,
+                iconSize: [120, 24],
+                iconAnchor: [60, 12]
+            });
+
+            const marker = L.marker([item.centerLat, item.centerLng], {
+                icon: labelIcon,
+                interactive: false
+            });
+
+            this.labelLayerGroup.addLayer(marker);
+        }
+    }
+
+    private updateLabelsVisibility() {
+        this.renderLabels();
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {

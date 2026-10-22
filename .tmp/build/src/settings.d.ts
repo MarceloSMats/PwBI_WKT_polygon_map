@@ -9,6 +9,8 @@ export declare class MapConfigCardSettings extends FormattingSettingsCard {
     customStyleUrl: formattingSettings.TextInput;
     autoFit: formattingSettings.ToggleSwitch;
     invertCoordinates: formattingSettings.ToggleSwitch;
+    renderEngine: formattingSettings.AutoDropdown;
+    smoothFactor: formattingSettings.NumUpDown;
     slices: Array<FormattingSettingsSlice>;
 }
 export declare class PolygonConfigCardSettings extends FormattingSettingsCard {
@@ -19,6 +21,11 @@ export declare class PolygonConfigCardSettings extends FormattingSettingsCard {
     strokeColor: formattingSettings.ColorPicker;
     strokeWidth: formattingSettings.NumUpDown;
     strokeOpacity: formattingSettings.NumUpDown;
+    strokeDashArray: formattingSettings.AutoDropdown;
+    enableHover: formattingSettings.ToggleSwitch;
+    hoverStrokeColor: formattingSettings.ColorPicker;
+    hoverStrokeWidth: formattingSettings.NumUpDown;
+    hoverFillOpacity: formattingSettings.NumUpDown;
     highlightColor: formattingSettings.ColorPicker;
     unselectedOpacity: formattingSettings.NumUpDown;
     slices: Array<FormattingSettingsSlice>;
@@ -53,11 +60,33 @@ export declare class WmsConfigCardSettings extends FormattingSettingsCard {
     wfsStrokeColor: formattingSettings.ColorPicker;
     slices: Array<FormattingSettingsSlice>;
 }
+export declare class LabelConfigCardSettings extends FormattingSettingsCard {
+    name: string;
+    displayName: string;
+    showLabels: formattingSettings.ToggleSwitch;
+    fontSize: formattingSettings.NumUpDown;
+    fontColor: formattingSettings.ColorPicker;
+    minZoom: formattingSettings.NumUpDown;
+    slices: Array<FormattingSettingsSlice>;
+}
+export declare class LodConfigCardSettings extends FormattingSettingsCard {
+    name: string;
+    displayName: string;
+    enableLod: formattingSettings.ToggleSwitch;
+    minPixelSize: formattingSettings.NumUpDown;
+    enableViewportCulling: formattingSettings.ToggleSwitch;
+    maxPolygonsOnScreen: formattingSettings.NumUpDown;
+    autoFetchMore: formattingSettings.ToggleSwitch;
+    maxTotalRows: formattingSettings.NumUpDown;
+    slices: Array<FormattingSettingsSlice>;
+}
 export declare class VisualFormattingSettingsModel extends FormattingSettingsModel {
     layerConfig: LayerConfigCardSettings;
     wmsConfig: WmsConfigCardSettings;
     mapConfig: MapConfigCardSettings;
     polygonConfig: PolygonConfigCardSettings;
+    labelConfig: LabelConfigCardSettings;
     tooltipConfig: TooltipConfigCardSettings;
-    cards: (LayerConfigCardSettings | WmsConfigCardSettings | MapConfigCardSettings | PolygonConfigCardSettings | TooltipConfigCardSettings)[];
+    lodConfig: LodConfigCardSettings;
+    cards: (LayerConfigCardSettings | WmsConfigCardSettings | MapConfigCardSettings | PolygonConfigCardSettings | LabelConfigCardSettings | TooltipConfigCardSettings | LodConfigCardSettings)[];
 }

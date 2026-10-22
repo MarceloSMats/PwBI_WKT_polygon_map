@@ -35,11 +35,25 @@ export class MapConfigCardSettings extends FormattingSettingsCard {
         value: false
     });
 
+    renderEngine = new formattingSettings.AutoDropdown({
+        name: "renderEngine",
+        displayName: "Motor de Renderização",
+        value: "canvas"
+    });
+
+    smoothFactor = new formattingSettings.NumUpDown({
+        name: "smoothFactor",
+        displayName: "Simplificação de Linhas",
+        value: 1.0
+    });
+
     slices: Array<FormattingSettingsSlice> = [
         this.basemap,
         this.customStyleUrl,
         this.autoFit,
-        this.invertCoordinates
+        this.invertCoordinates,
+        this.renderEngine,
+        this.smoothFactor
     ];
 }
 
@@ -77,6 +91,36 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
         value: 100
     });
 
+    strokeDashArray = new formattingSettings.AutoDropdown({
+        name: "strokeDashArray",
+        displayName: "Padrão da Borda",
+        value: "solid"
+    });
+
+    enableHover = new formattingSettings.ToggleSwitch({
+        name: "enableHover",
+        displayName: "Destaque ao Passar o Mouse",
+        value: true
+    });
+
+    hoverStrokeColor = new formattingSettings.ColorPicker({
+        name: "hoverStrokeColor",
+        displayName: "Cor da Borda no Destaque",
+        value: { value: "#2563eb" }
+    });
+
+    hoverStrokeWidth = new formattingSettings.NumUpDown({
+        name: "hoverStrokeWidth",
+        displayName: "Espessura no Destaque (px)",
+        value: 3
+    });
+
+    hoverFillOpacity = new formattingSettings.NumUpDown({
+        name: "hoverFillOpacity",
+        displayName: "Opacidade no Destaque (%)",
+        value: 80
+    });
+
     highlightColor = new formattingSettings.ColorPicker({
         name: "highlightColor",
         displayName: "Cor de Seleção / Destaque",
@@ -95,6 +139,11 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
         this.strokeColor,
         this.strokeWidth,
         this.strokeOpacity,
+        this.strokeDashArray,
+        this.enableHover,
+        this.hoverStrokeColor,
+        this.hoverStrokeWidth,
+        this.hoverFillOpacity,
         this.highlightColor,
         this.unselectedOpacity
     ];
@@ -232,18 +281,110 @@ export class WmsConfigCardSettings extends FormattingSettingsCard {
     ];
 }
 
+export class LabelConfigCardSettings extends FormattingSettingsCard {
+    name = "labelConfig";
+    displayName = "Rótulos dos Polígonos (Labels)";
+
+    showLabels = new formattingSettings.ToggleSwitch({
+        name: "showLabels",
+        displayName: "Exibir Rótulos no Mapa",
+        value: false
+    });
+
+    fontSize = new formattingSettings.NumUpDown({
+        name: "fontSize",
+        displayName: "Tamanho da Fonte (pt)",
+        value: 10
+    });
+
+    fontColor = new formattingSettings.ColorPicker({
+        name: "fontColor",
+        displayName: "Cor do Texto",
+        value: { value: "#1e293b" }
+    });
+
+    minZoom = new formattingSettings.NumUpDown({
+        name: "minZoom",
+        displayName: "Zoom Mínimo de Exibição",
+        value: 6
+    });
+
+    slices: Array<FormattingSettingsSlice> = [
+        this.showLabels,
+        this.fontSize,
+        this.fontColor,
+        this.minZoom
+    ];
+}
+
+export class LodConfigCardSettings extends FormattingSettingsCard {
+    name = "lodConfig";
+    displayName = "Performance & Zoom Dinâmico (LOD)";
+
+    enableLod = new formattingSettings.ToggleSwitch({
+        name: "enableLod",
+        displayName: "Ativar LOD (Level of Detail)",
+        value: true
+    });
+
+    minPixelSize = new formattingSettings.NumUpDown({
+        name: "minPixelSize",
+        displayName: "Tamanho Mínimo na Tela (px)",
+        value: 4
+    });
+
+    enableViewportCulling = new formattingSettings.ToggleSwitch({
+        name: "enableViewportCulling",
+        displayName: "Ocultar Fora da Tela (Culling)",
+        value: true
+    });
+
+    maxPolygonsOnScreen = new formattingSettings.NumUpDown({
+        name: "maxPolygonsOnScreen",
+        displayName: "Limite de Polígonos na Tela",
+        value: 10000
+    });
+
+    autoFetchMore = new formattingSettings.ToggleSwitch({
+        name: "autoFetchMore",
+        displayName: "Carregamento Contínuo (Streaming)",
+        value: true
+    });
+
+    maxTotalRows = new formattingSettings.NumUpDown({
+        name: "maxTotalRows",
+        displayName: "Limite Máximo de Registros",
+        value: 100000
+    });
+
+    slices: Array<FormattingSettingsSlice> = [
+        this.enableLod,
+        this.minPixelSize,
+        this.enableViewportCulling,
+        this.maxPolygonsOnScreen,
+        this.autoFetchMore,
+        this.maxTotalRows
+    ];
+}
+
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     layerConfig = new LayerConfigCardSettings();
     wmsConfig = new WmsConfigCardSettings();
     mapConfig = new MapConfigCardSettings();
     polygonConfig = new PolygonConfigCardSettings();
+    labelConfig = new LabelConfigCardSettings();
     tooltipConfig = new TooltipConfigCardSettings();
+    lodConfig = new LodConfigCardSettings();
 
     cards = [
         this.layerConfig,
         this.wmsConfig,
         this.mapConfig,
         this.polygonConfig,
-        this.tooltipConfig
+        this.labelConfig,
+        this.tooltipConfig,
+        this.lodConfig
     ];
 }
+
+
