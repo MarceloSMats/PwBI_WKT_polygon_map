@@ -8,18 +8,23 @@ export declare class MapConfigCardSettings extends FormattingSettingsCard {
     basemap: formattingSettings.AutoDropdown;
     customStyleUrl: formattingSettings.TextInput;
     autoFit: formattingSettings.ToggleSwitch;
+    autoFitOnFilter: formattingSettings.ToggleSwitch;
+    enableBoxSelect: formattingSettings.ToggleSwitch;
     invertCoordinates: formattingSettings.ToggleSwitch;
     renderEngine: formattingSettings.AutoDropdown;
     smoothFactor: formattingSettings.NumUpDown;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class PolygonConfigCardSettings extends FormattingSettingsCard {
     name: string;
     displayName: string;
     defaultFillColor: formattingSettings.ColorPicker;
     fillOpacity: formattingSettings.NumUpDown;
+    autoStrokeColor: formattingSettings.ToggleSwitch;
     strokeColor: formattingSettings.ColorPicker;
     strokeWidth: formattingSettings.NumUpDown;
+    adaptiveStrokeWidth: formattingSettings.ToggleSwitch;
     strokeOpacity: formattingSettings.NumUpDown;
     strokeDashArray: formattingSettings.AutoDropdown;
     enableHover: formattingSettings.ToggleSwitch;
@@ -29,6 +34,7 @@ export declare class PolygonConfigCardSettings extends FormattingSettingsCard {
     highlightColor: formattingSettings.ColorPicker;
     unselectedOpacity: formattingSettings.NumUpDown;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class TooltipConfigCardSettings extends FormattingSettingsCard {
     name: string;
@@ -36,6 +42,7 @@ export declare class TooltipConfigCardSettings extends FormattingSettingsCard {
     showTooltip: formattingSettings.ToggleSwitch;
     showWktInTooltip: formattingSettings.ToggleSwitch;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class LayerConfigCardSettings extends FormattingSettingsCard {
     name: string;
@@ -43,6 +50,7 @@ export declare class LayerConfigCardSettings extends FormattingSettingsCard {
     showLayerControl: formattingSettings.ToggleSwitch;
     autoFitOnToggle: formattingSettings.ToggleSwitch;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class WmsConfigCardSettings extends FormattingSettingsCard {
     name: string;
@@ -59,6 +67,7 @@ export declare class WmsConfigCardSettings extends FormattingSettingsCard {
     wfsColor: formattingSettings.ColorPicker;
     wfsStrokeColor: formattingSettings.ColorPicker;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class LabelConfigCardSettings extends FormattingSettingsCard {
     name: string;
@@ -67,7 +76,9 @@ export declare class LabelConfigCardSettings extends FormattingSettingsCard {
     fontSize: formattingSettings.NumUpDown;
     fontColor: formattingSettings.ColorPicker;
     minZoom: formattingSettings.NumUpDown;
+    avoidCollisions: formattingSettings.ToggleSwitch;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class LodConfigCardSettings extends FormattingSettingsCard {
     name: string;
@@ -79,6 +90,7 @@ export declare class LodConfigCardSettings extends FormattingSettingsCard {
     autoFetchMore: formattingSettings.ToggleSwitch;
     maxTotalRows: formattingSettings.NumUpDown;
     slices: Array<FormattingSettingsSlice>;
+    onPreProcess(): void;
 }
 export declare class VisualFormattingSettingsModel extends FormattingSettingsModel {
     layerConfig: LayerConfigCardSettings;
@@ -88,5 +100,5 @@ export declare class VisualFormattingSettingsModel extends FormattingSettingsMod
     labelConfig: LabelConfigCardSettings;
     tooltipConfig: TooltipConfigCardSettings;
     lodConfig: LodConfigCardSettings;
-    cards: (LayerConfigCardSettings | WmsConfigCardSettings | MapConfigCardSettings | PolygonConfigCardSettings | LabelConfigCardSettings | TooltipConfigCardSettings | LodConfigCardSettings)[];
+    cards: (MapConfigCardSettings | TooltipConfigCardSettings | LayerConfigCardSettings | WmsConfigCardSettings | PolygonConfigCardSettings | LabelConfigCardSettings | LodConfigCardSettings)[];
 }

@@ -1,5 +1,6 @@
 "use strict";
 
+import powerbi from "powerbi-visuals-api";
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 
 import FormattingSettingsCard = formattingSettings.SimpleCard;
@@ -18,14 +19,26 @@ export class MapConfigCardSettings extends FormattingSettingsCard {
 
     customStyleUrl = new formattingSettings.TextInput({
         name: "customStyleUrl",
-        displayName: "URL do Estilo Personalizado",
-        placeholder: "https://.../style.json",
+        displayName: "URL de Tiles Personalizada",
+        placeholder: "https://.../{z}/{x}/{y}.png",
         value: ""
     });
 
     autoFit = new formattingSettings.ToggleSwitch({
         name: "autoFit",
         displayName: "Ajuste Automático de Zoom (Fit)",
+        value: true
+    });
+
+    autoFitOnFilter = new formattingSettings.ToggleSwitch({
+        name: "autoFitOnFilter",
+        displayName: "Focar ao Filtrar por Outros Visuais",
+        value: true
+    });
+
+    enableBoxSelect = new formattingSettings.ToggleSwitch({
+        name: "enableBoxSelect",
+        displayName: "Seleção Espacial por Área (Retângulo)",
         value: true
     });
 
@@ -51,10 +64,17 @@ export class MapConfigCardSettings extends FormattingSettingsCard {
         this.basemap,
         this.customStyleUrl,
         this.autoFit,
+        this.autoFitOnFilter,
+        this.enableBoxSelect,
         this.invertCoordinates,
         this.renderEngine,
         this.smoothFactor
     ];
+
+    public onPreProcess(): void {
+        this.customStyleUrl.visible = (this.basemap.value as string) === "custom";
+        this.autoFitOnFilter.visible = !!this.autoFit.value;
+    }
 }
 
 export class PolygonConfigCardSettings extends FormattingSettingsCard {
@@ -64,7 +84,8 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
     defaultFillColor = new formattingSettings.ColorPicker({
         name: "defaultFillColor",
         displayName: "Cor de Preenchimento Padrão",
-        value: { value: "#3b82f6" }
+        value: { value: "#3b82f6" },
+        instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
     });
 
     fillOpacity = new formattingSettings.NumUpDown({
@@ -73,16 +94,29 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
         value: 60
     });
 
+    autoStrokeColor = new formattingSettings.ToggleSwitch({
+        name: "autoStrokeColor",
+        displayName: "Borda Automática (Harmônica)",
+        value: true
+    });
+
     strokeColor = new formattingSettings.ColorPicker({
         name: "strokeColor",
         displayName: "Cor da Borda",
-        value: { value: "#1d4ed8" }
+        value: { value: "#1d4ed8" },
+        instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule
     });
 
     strokeWidth = new formattingSettings.NumUpDown({
         name: "strokeWidth",
         displayName: "Espessura da Borda (px)",
         value: 2
+    });
+
+    adaptiveStrokeWidth = new formattingSettings.ToggleSwitch({
+        name: "adaptiveStrokeWidth",
+        displayName: "Espessura Adaptativa ao Zoom",
+        value: true
     });
 
     strokeOpacity = new formattingSettings.NumUpDown({
@@ -136,8 +170,10 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
     slices: Array<FormattingSettingsSlice> = [
         this.defaultFillColor,
         this.fillOpacity,
+        this.autoStrokeColor,
         this.strokeColor,
         this.strokeWidth,
+        this.adaptiveStrokeWidth,
         this.strokeOpacity,
         this.strokeDashArray,
         this.enableHover,
@@ -147,6 +183,14 @@ export class PolygonConfigCardSettings extends FormattingSettingsCard {
         this.highlightColor,
         this.unselectedOpacity
     ];
+
+    public onPreProcess(): void {
+        this.strokeColor.visible = !this.autoStrokeColor.value;
+        const hoverEnabled = !!this.enableHover.value;
+        this.hoverStrokeColor.visible = hoverEnabled;
+        this.hoverStrokeWidth.visible = hoverEnabled;
+        this.hoverFillOpacity.visible = hoverEnabled;
+    }
 }
 
 export class TooltipConfigCardSettings extends FormattingSettingsCard {
@@ -169,6 +213,10 @@ export class TooltipConfigCardSettings extends FormattingSettingsCard {
         this.showTooltip,
         this.showWktInTooltip
     ];
+
+    public onPreProcess(): void {
+        this.showWktInTooltip.visible = !!this.showTooltip.value;
+    }
 }
 
 export class LayerConfigCardSettings extends FormattingSettingsCard {
@@ -191,6 +239,10 @@ export class LayerConfigCardSettings extends FormattingSettingsCard {
         this.showLayerControl,
         this.autoFitOnToggle
     ];
+
+    public onPreProcess(): void {
+        this.autoFitOnToggle.visible = !!this.showLayerControl.value;
+    }
 }
 
 export class WmsConfigCardSettings extends FormattingSettingsCard {
@@ -279,6 +331,24 @@ export class WmsConfigCardSettings extends FormattingSettingsCard {
         this.wfsColor,
         this.wfsStrokeColor
     ];
+
+    public onPreProcess(): void {
+        const isEnabled = !!this.enabled.value;
+        const type = ((this.serviceType.value as string) || "wms").toLowerCase();
+
+        this.serviceType.visible = isEnabled;
+        this.layerTitle.visible = isEnabled;
+        this.url.visible = isEnabled;
+        this.layerName.visible = isEnabled;
+        this.opacity.visible = isEnabled;
+
+        this.wmsFormat.visible = isEnabled && type === "wms";
+        this.wmsTransparent.visible = isEnabled && type === "wms";
+        this.wmsVersion.visible = isEnabled && type === "wms";
+
+        this.wfsColor.visible = isEnabled && type === "wfs";
+        this.wfsStrokeColor.visible = isEnabled && type === "wfs";
+    }
 }
 
 export class LabelConfigCardSettings extends FormattingSettingsCard {
@@ -309,12 +379,27 @@ export class LabelConfigCardSettings extends FormattingSettingsCard {
         value: 6
     });
 
+    avoidCollisions = new formattingSettings.ToggleSwitch({
+        name: "avoidCollisions",
+        displayName: "Ocultar Rótulos Sobrepostos",
+        value: true
+    });
+
     slices: Array<FormattingSettingsSlice> = [
         this.showLabels,
         this.fontSize,
         this.fontColor,
-        this.minZoom
+        this.minZoom,
+        this.avoidCollisions
     ];
+
+    public onPreProcess(): void {
+        const active = !!this.showLabels.value;
+        this.fontSize.visible = active;
+        this.fontColor.visible = active;
+        this.minZoom.visible = active;
+        this.avoidCollisions.visible = active;
+    }
 }
 
 export class LodConfigCardSettings extends FormattingSettingsCard {
@@ -365,6 +450,11 @@ export class LodConfigCardSettings extends FormattingSettingsCard {
         this.autoFetchMore,
         this.maxTotalRows
     ];
+
+    public onPreProcess(): void {
+        this.minPixelSize.visible = !!this.enableLod.value;
+        this.maxTotalRows.visible = !!this.autoFetchMore.value;
+    }
 }
 
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
@@ -386,5 +476,3 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.lodConfig
     ];
 }
-
-

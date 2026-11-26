@@ -81,7 +81,7 @@ Visual customizado de altíssima performance para o Microsoft Power BI, inspirad
 ## 🚀 Como Utilizar no Power BI Desktop
 
 1. O novo arquivo compilado está em:
-   [`dist/wktPolygonMapD3C983E422CF431EB88DC278ED1CA011.1.0.0.0.pbiviz`](dist/wktPolygonMapD3C983E422CF431EB88DC278ED1CA011.1.0.0.0.pbiviz)
+   [`dist/wktPolygonMapD3C983E422CF431EB88DC278ED1CA011.2.0.0.0.pbiviz`](dist/wktPolygonMapD3C983E422CF431EB88DC278ED1CA011.2.0.0.0.pbiviz)
 2. No **Power BI Desktop**, vá no painel de **Visualizações**, clique nos **três pontos (`...`)** e selecione **Importar um visual de um arquivo**.
 3. Selecione o arquivo `.pbiviz` gerado na pasta `Map_Viz/dist/`.
 4. Arraste os campos no visual:

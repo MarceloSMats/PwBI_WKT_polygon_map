@@ -210,7 +210,21 @@
                 },
                 "autoFit": {
                     "displayName": "Ajuste Automático de Zoom (Fit Bounds)",
-                    "description": "Ajusta o zoom aos limites dos polígonos automaticamente",
+                    "description": "Ajusta o zoom aos limites dos polígonos automaticamente no carregamento inicial",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "autoFitOnFilter": {
+                    "displayName": "Focar ao Filtrar por Outros Visuais",
+                    "description": "Centraliza e ajusta o zoom automaticamente nos polígonos quando filtrados ou destacados por outro visual do Power BI",
+                    "type": {
+                        "bool": true
+                    }
+                },
+                "enableBoxSelect": {
+                    "displayName": "Seleção Espacial por Área (Retângulo)",
+                    "description": "Exibe ferramenta no mapa (ou Shift + Arrastar) para selecionar múltiplos polígonos desenhando um retângulo",
                     "type": {
                         "bool": true
                     }
@@ -266,6 +280,13 @@
                         "numeric": true
                     }
                 },
+                "autoStrokeColor": {
+                    "displayName": "Borda Automática (Harmônica)",
+                    "description": "Deriva automaticamente a cor da borda em tom mais escuro a partir da cor de preenchimento de cada polígono ou camada",
+                    "type": {
+                        "bool": true
+                    }
+                },
                 "strokeColor": {
                     "displayName": "Cor da Borda",
                     "type": {
@@ -280,6 +301,13 @@
                     "displayName": "Espessura da Borda (px)",
                     "type": {
                         "numeric": true
+                    }
+                },
+                "adaptiveStrokeWidth": {
+                    "displayName": "Espessura Adaptativa ao Zoom",
+                    "description": "Afina suavemente a borda em zooms afastados para não encobrir o preenchimento de polígonos pequenos",
+                    "type": {
+                        "bool": true
                     }
                 },
                 "strokeOpacity": {
@@ -390,6 +418,13 @@
                     "description": "Oculta os rótulos em zooms afastados para manter o mapa limpo",
                     "type": {
                         "numeric": true
+                    }
+                },
+                "avoidCollisions": {
+                    "displayName": "Ocultar Rótulos Sobrepostos",
+                    "description": "Evita colisão de textos na tela priorizando os maiores polígonos",
+                    "type": {
+                        "bool": true
                     }
                 }
             }
@@ -516,6 +551,7 @@
         "default": {}
     },
     "supportsHighlight": true,
+    "supportsMultiVisualSelection": true,
     "privileges": [
         {
             "name": "WebAccess",
